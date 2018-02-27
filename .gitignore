@@ -57,3 +57,8 @@ typings/
 # dotenv environment variables file
 .env
 
+#pdf files
+*.pdf
+
+#secrets directory
+secrets/*
