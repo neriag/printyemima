@@ -2,12 +2,15 @@ import fs from 'fs';
 import readline from 'readline';
 import {google} from 'googleapis';
 import googleAuth from 'google-auth-library';
+import open from 'open';
+
 
 let SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 let TOKEN_DIR = "./secrets/.credentials/";
 let TOKEN_PATH = TOKEN_DIR + 'gmail-nodejs-quickstart.json';
 
 function authhorizeToGoogle(callback){
+    console.log("Getting the authorization of the application to access to gmail API...")
     fs.readFile('./secrets/keys/client_secret.json', function processClientSecrets(err, content) {
         if (err) {
         console.log('Error loagding client secret file: ' + err);
@@ -24,6 +27,7 @@ function authorize(credentials, callback) {
   var auth = new googleAuth();
   var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
 
+  console.log("Receiving access permission to your mailbox");
   // Check if we have previously stored a token.
   fs.readFile(TOKEN_PATH, function(err, token) {
     if (err) {
@@ -40,7 +44,10 @@ function getNewToken(oauth2Client, callback) {
     access_type: 'offline',
     scope: SCOPES
   });
-  console.log('Authorize this app by visiting this url: ', authUrl);
+
+  console.log("We need your permission to acccess to your mailbox, please enter the code from the browser")
+  open(authUrl);
+
   var rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -72,8 +79,7 @@ function storeToken(token) {
 }
 
 function handleAttachment(err, response, filename){
-  let data = response.data;
-  let buffer = new Buffer(data, 'base64');
+  let buffer = new Buffer(response.data, 'base64');
   fs.writeFile("./" + filename, buffer,  "binary",(err) => {
     if (err) {
       console.log("Cannot save the data to pdf", err)
@@ -84,7 +90,8 @@ function handleAttachment(err, response, filename){
 }
 
 
-function showMessages(auth){
+function downloadLesson(auth){
+    console.log("Connecting to gmail...");
     var gmail = google.gmail('v1');
     gmail.users.messages.list({auth:auth, userId:"me",}, { qs: { q:'from:info@parasha.org has:attachment (subject:לפרשת OR subject:ופרשת) ', maxResults:1}}, (err, response) => {
         if (err) {
@@ -92,14 +99,16 @@ function showMessages(auth){
             return;
         }
 
+        console.log("Looking for the message with the wanted file");
         let messageId = response.messages[0].id;
         gmail.users.messages.get({id:messageId, userId:'me', auth:auth}, (err, response) => {
           let pdf = response.payload.parts.filter(part => part.filename.endsWith('pdf'))[0];
           let pdfName = pdf.filename;
           let pdfId = pdf.body.attachmentId;
+          console.log("Downloading the file")
           gmail.users.messages.attachments.get({auth:auth, userId:'me', messageId:messageId, id:pdfId}, (err, response) => handleAttachment(err, response, pdfName))
         });
     });
 }
 
-authhorizeToGoogle(showMessages);
+authhorizeToGoogle(downloadLesson);
